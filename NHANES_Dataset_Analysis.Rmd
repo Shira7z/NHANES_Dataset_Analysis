@@ -1,0 +1,251 @@
+---
+title: "NHANES Dataset Analysis"
+author: "ShimanZhang"
+output: html_document
+---
+
+## Report
+
+### Backgroud:
+Vitamin D has been implicated in various physiological functions, including its potential role in glucose metabolism. This study aims to investigate the relationship between Vitamin D levels and diabetes, a condition characterized by impaired blood sugar regulation. Prior research suggests a potential association between low Vitamin D levels and the risk of developing diabetes.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(kableExtra)
+library(broom)
+library(dplyr)
+library(NHANES)
+library(nhanesA)
+data("NHANES")
+NHANES <- NHANES[!duplicated(NHANES$ID),]
+VID <- nhanes('VID_F')
+```
+
+### Methods：
+Utilize the NHANES dataset, focusing on Vitamin D levels and diabetes status.\
+Handling missing values and potential confounding variables will be vital.\
+Cohort inclusion criteria will involve adults with complete data on Vitamin D levels and diabetes status.\
+The primary focus is on the association between Vitamin D levels and diabetes.
+
+```{r echo=FALSE}
+df1 <- NHANES[c('ID', 'Gender', 'Age', 'AgeDecade', 'Diabetes')]
+df1 <- df1[df1$Age >= 18, ]
+df2 <- VID[c('SEQN', 'LBXVIDMS')]
+df <- merge(df1, df2, by.x = "ID", by.y = "SEQN")
+names(df)[names(df) == "LBXVIDMS"] <- "VitaminD"
+df <- na.omit(df)
+```
+
+```{r echo=FALSE}
+summary_stats <- df %>%
+  group_by(Diabetes) %>%
+  summarise(
+    Mean_VitaminD = mean(VitaminD),
+    SD_VitaminD = sd(VitaminD),
+    Median_VitaminD = median(VitaminD)
+  )
+
+kable(summary_stats, format = "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+### Results & Conclusion：
+
+#### Logistic regression model:
+
+```{r echo=FALSE, include=FALSE}
+model <- glm(Diabetes ~ VitaminD, data = df, family = "binomial")
+summary(model)
+```
+
+```{r echo=FALSE}
+model <- glm(Diabetes ~ VitaminD, data = df, family = "binomial")
+kable(tidy(model), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+##### Conclusion：
+
+The coefficient for Vitamin D is -0.0080601. This represents that for each unit increase in Vitamin D, the log odds of having diabetes decrease by 0.0080601. In other words, higher levels of Vitamin D are associated with a decrease in the log odds of having diabetes. \
+This finding is supported by the statistically significant p-value for the Vitamin D coefficient, indicating that the association is unlikely to be due to random chance.
+
+\
+
+#### Subgroup analyses based on age and gender: 
+
+```{r echo=FALSE}
+subgroup_analysis_age <- df %>%
+  group_by(AgeDecade, Diabetes) %>%
+  summarise(Mean_VitaminD = mean(VitaminD), .groups = "drop")
+
+kable(subgroup_analysis_age, format = "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+```{r echo=FALSE}
+subgroup_analysis_gender <- df %>%
+  group_by(Gender, Diabetes) %>%
+  summarise(Mean_VitaminD = mean(VitaminD), .groups = "drop")
+
+kable(subgroup_analysis_gender, format = "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+#### Logistic regression model:
+
+#### Model with Vitamin D and Age:
+
+```{r echo=FALSE}
+model_age <- glm(Diabetes ~ VitaminD + Age, data = df, family = "binomial")
+kable(tidy(model_age), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+##### Compare models with likelihood ratio tests:
+```{r echo=FALSE}
+lr_test_age <- anova(model, model_age, test="LRT")
+kable(tidy(lr_test_age), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+##### Conclusion:
+
+The extremely small p-value (0) suggests strong evidence against the null hypothesis that the two models are equivalent. Therefore, we can conclude that including 'Age Decade' in the model significantly improves the model fit, and the association between 'Age Decade' and 'Diabetes' is statistically significant.
+
+\
+
+#### Model with VitaminD and Gender:
+
+```{r echo=FALSE}
+model_gender <- glm(Diabetes ~ VitaminD + Gender, data = df, family = "binomial")
+kable(tidy(model_gender), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+##### Compare models with likelihood ratio tests:
+```{r echo=FALSE}
+lr_test_gender <- anova(model, model_gender, test="LRT")
+kable(tidy(lr_test_gender), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+##### Conclusion:
+
+The p-value is 0.1055726, which is greater than the conventional significance level of 0.05. It suggests that the improvement in model fit achieved by adding 'Gender' is not statistically significant. Based on this result, we may fail to reject the null hypothesis that there is no significant difference in model fit between the two models.
+
+\
+
+#### Model with VitaminD, Age, and Gender:
+
+```{r echo=FALSE}
+model_age_gender <- glm(Diabetes ~ VitaminD + Age + Gender, data = df, family = "binomial")
+kable(tidy(model_age_gender), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+##### Compare models with likelihood ratio tests:
+
+```{r echo=FALSE}
+lr_test_age_gender <- anova(model, model_age_gender, test="LRT")
+kable(tidy(lr_test_age_gender), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+##### Conclusion:
+
+The p-value is extremely small (0), indicating that the improvement in model fit achieved by adding 'Age Decade' and 'Gender' is statistically significant. The statistically significant result suggests that including 'Age Decade' and 'Gender' in the model significantly improves the fit compared to the model with only 'Vitamin D'.
+
+
+### References：
+Mitri, J., & Pittas, A. G. (2014). Vitamin D and diabetes. Endocrinology and metabolism clinics of North America, 43(1), 205–232. https://doi.org/10.1016/j.ecl.2013.09.010
+
+\
+
+## Analysis plan
+
+### Background and Rationale
+
+Understanding the potential association between Vitamin D levels and diabetes could offer insights into preventive strategies and disease management.
+
+### Study Aims
+
+#### Primary Study Aim：
+
+Investigate the association between Vitamin D levels and the presence of diabetes.
+
+#### Secondary Study Aims：
+
+Explore potential differences in this association among demographic subgroups.
+
+### Study Hypotheses
+
+#### Primary Outcome：
+
+Null Hypothesis (H0): There is no significant association between Vitamin D levels and the presence of diabetes.
+
+Alternative Hypothesis (H1): Lower Vitamin D levels are associated with an increased risk of diabetes.
+
+#### Secondary Outcome：
+Hypotheses related to differences in this association across age and gender.
+
+### Data Extraction and Analysis Plan
+
+#### Study Cohort Definitions：
+
+Inclusion of adult participants with complete data on Vitamin D levels and diabetes status.
+
+
+#### Analyses to perform
+
+Descriptive statistics of Vitamin D levels in individuals with and without diabetes.
+
+```{r echo=FALSE}
+subgroup_analysis_gender <- df %>%
+  group_by(Gender, Diabetes) %>%
+  summarise(Mean_VitaminD = mean(VitaminD), .groups = "drop")
+
+kable(subgroup_analysis_gender, format = "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+```{r echo=FALSE}
+subgroup_analysis_age <- df %>%
+  group_by(AgeDecade, Diabetes) %>%
+  summarise(Mean_VitaminD = mean(VitaminD), .groups = "drop")
+
+kable(subgroup_analysis_age, format = "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+```{r echo=FALSE}
+subgroup_analysis_gender <- df %>%
+  group_by(Gender, Diabetes) %>%
+  summarise(Mean_VitaminD = mean(VitaminD), .groups = "drop")
+
+kable(subgroup_analysis_gender, format = "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+Statistical tests to analyze the association between Vitamin D levels and diabetes.
+
+```{r echo=FALSE}
+model <- glm(Diabetes ~ VitaminD, data = df, family = "binomial")
+kable(tidy(model), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+```{r echo=FALSE}
+model_age <- glm(Diabetes ~ VitaminD + Age, data = df, family = "binomial")
+kable(tidy(model_age), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+```{r echo=FALSE}
+model_gender <- glm(Diabetes ~ VitaminD + Gender, data = df, family = "binomial")
+kable(tidy(model_gender), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+```{r echo=FALSE}
+model_age_gender <- glm(Diabetes ~ VitaminD + Age + Gender, data = df, family = "binomial")
+kable(tidy(model_age_gender), "html") %>%
+  kable_styling(full_width = FALSE)
+```
